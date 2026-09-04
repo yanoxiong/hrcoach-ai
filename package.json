@@ -1,8 +1,8 @@
 {
   "name": "hrcoach-ai-online",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "HRCoach AI - deployable full-stack MVP",
+  "description": "HRCoach AI - deployable full-stack MVP with PostgreSQL",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,12 +14,12 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
-    "better-sqlite3": "^12.2.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "openai": "^5.20.1"
+    "openai": "^5.20.1",
+    "pg": "^8.16.3"
   }
 }
