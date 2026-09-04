@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="HRCoach AI — AI coaching for frontline managers." />
+  <title>HRCoach AI</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast hidden"></div>
+
+  <section id="authView" class="auth-page">
+    <div class="auth-wrap">
+      <div class="brand-block">
+        <div class="logo">HC</div>
+        <div>
+          <h1>HRCoach AI</h1>
+          <p>AI coaching for frontline managers.</p>
+        </div>
+      </div>
+
+      <div class="auth-card">
+        <div class="tabs">
+          <button id="loginTab" class="tab active">Sign in</button>
+          <button id="registerTab" class="tab">Create account</button>
+        </div>
+
+        <form id="loginForm" class="form">
+          <label>Email<input id="loginEmail" type="email" required autocomplete="email" /></label>
+          <label>Password<input id="loginPassword" type="password" required autocomplete="current-password" /></label>
+          <button class="primary" type="submit">Sign in</button>
+        </form>
+
+        <form id="registerForm" class="form hidden">
+          <label>Your name<input id="registerName" required /></label>
+          <label>Business name<input id="registerCompany" required /></label>
+          <label>Email<input id="registerEmail" type="email" required autocomplete="email" /></label>
+          <label>Password<input id="registerPassword" type="password" minlength="8" required autocomplete="new-password" /></label>
+          <button class="primary" type="submit">Create HRCoach account</button>
+        </form>
+      </div>
+
+      <p class="fine">Prototype notice: use fictional/demo employee data until you have completed your production privacy, security, and legal review.</p>
+    </div>
+  </section>
+
+  <div id="appView" class="shell hidden">
+    <header class="topbar">
+      <div class="brand-mini">
+        <div class="logo small">HC</div>
+        <div>
+          <strong>HRCoach AI</strong>
+          <span id="companyName">Company</span>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="modeBadge" class="badge">Checking AI…</span>
+        <button id="logoutBtn" class="ghost">Sign out</button>
+      </div>
+    </header>
+
+    <main id="main"></main>
+
+    <nav class="bottom-nav">
+      <button data-route="home" class="nav active">Home</button>
+      <button data-route="employees" class="nav">Employees</button>
+      <button data-route="tools" class="nav">Tools</button>
+      <button data-route="history" class="nav">History</button>
+      <button data-route="account" class="nav">Account</button>
+    </nav>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
