@@ -8,6 +8,7 @@ const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const { Pool } = require("pg");
 const OpenAI = require("openai");
 
@@ -164,6 +165,24 @@ async function sendMail(to, subject, text) {
     console.log("===== END EMAIL =====\n");
     return;
   }
+
+  if (EMAIL_MODE === "resend") {
+    if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured.");
+    if (!process.env.EMAIL_FROM) throw new Error("EMAIL_FROM is not configured.");
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM,
+      to: [to],
+      subject,
+      text
+    });
+
+    if (error) throw new Error(error.message || "Resend could not send email.");
+    console.log("Resend email sent:", data?.id || "ok");
+    return;
+  }
+
   const t = transporter();
   if (!t) throw new Error("Email transport not configured.");
   await t.sendMail({ from: process.env.EMAIL_FROM || process.env.SMTP_USER, to, subject, text });
