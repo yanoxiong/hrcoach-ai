@@ -104,6 +104,7 @@ async function initDb() {
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_plan TEXT;
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ;
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMPTZ;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 }
 
@@ -119,17 +120,70 @@ app.post("/api/stripe/webhook", express.raw({type:"application/json"}), async (r
     if(event.type==="checkout.session.completed" && obj.mode==="subscription" && obj.metadata?.company_id)
       await pool.query(`UPDATE companies SET stripe_customer_id=$1,stripe_subscription_id=$2 WHERE id=$3`,[obj.customer,obj.subscription,obj.metadata.company_id]);
     if(["customer.subscription.created","customer.subscription.updated","customer.subscription.deleted"].includes(event.type)){
-      const companyId=obj.metadata?.company_id, plan=obj.metadata?.plan||null;
-      const trialEnd=obj.trial_end?new Date(obj.trial_end*1000):null, periodEnd=obj.current_period_end?new Date(obj.current_period_end*1000):null;
-      if(companyId) await pool.query(`UPDATE companies SET stripe_customer_id=$1,stripe_subscription_id=$2,subscription_status=$3,subscription_plan=COALESCE($4,subscription_plan),trial_ends_at=$5,subscription_current_period_end=$6 WHERE id=$7`,[obj.customer,obj.id,obj.status,plan,trialEnd,periodEnd,companyId]);
-      else await pool.query(`UPDATE companies SET subscription_status=$1,trial_ends_at=$2,subscription_current_period_end=$3 WHERE stripe_subscription_id=$4`,[obj.status,trialEnd,periodEnd,obj.id]);
-    }
-    if(event.type==="invoice.payment_failed"){ const sid=typeof obj.subscription==="string"?obj.subscription:obj.subscription?.id; if(sid) await pool.query(`UPDATE companies SET subscription_status='past_due' WHERE stripe_subscription_id=$1`,[sid]); }
-    res.json({received:true});
-  }catch(e){console.error("Stripe webhook handler error:",e);res.status(500).send("Webhook handler failed.");}
+  const companyId=obj.metadata?.company_id;
+  const plan=obj.metadata?.plan||null;
+  const trialEnd=obj.trial_end?new Date(obj.trial_end*1000):null;
+  const periodEnd=obj.current_period_end?new Date(obj.current_period_end*1000):null;
+  const cancelAtPeriodEnd=Boolean(obj.cancel_at_period_end);
+
+  if(companyId){
+    await pool.query(
+      `UPDATE companies
+       SET stripe_customer_id=$1,
+           stripe_subscription_id=$2,
+           subscription_status=$3,
+           subscription_plan=COALESCE($4,subscription_plan),
+           trial_ends_at=$5,
+           subscription_current_period_end=$6,
+           cancel_at_period_end=$7
+       WHERE id=$8`,
+      [obj.customer,obj.id,obj.status,plan,trialEnd,periodEnd,cancelAtPeriodEnd,companyId]
+    );
+  }else{
+    await pool.query(
+      `UPDATE companies
+       SET subscription_status=$1,
+           trial_ends_at=$2,
+           subscription_current_period_end=$3,
+           cancel_at_period_end=$4
+       WHERE stripe_subscription_id=$5`,
+      [obj.status,trialEnd,periodEnd,cancelAtPeriodEnd,obj.id]
+    );
+  }
+}   
+    
+if(event.type==="invoice.payment_failed"){
+  const sid=typeof obj.subscription==="string"
+    ? obj.subscription
+    : obj.subscription?.id;
+
+  if(sid){
+    await pool.query(
+      `UPDATE companies
+       SET subscription_status='past_due'
+       WHERE stripe_subscription_id=$1`,
+      [sid]
+    );
+  }
+}
+
+res.json({received:true});
+
+}catch(e){
+  console.error("Stripe webhook handler error:",e);
+  res.status(500).send("Webhook handler failed.");
+}
 });
+
 app.use(express.json({ limit: "100kb" }));
-app.use(rateLimit({ windowMs: 15*60*1000, max: 300, standardHeaders: true, legacyHeaders: false }));
+
+app.use(rateLimit({
+  windowMs: 15*60*1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false
+}));
+
 app.use(express.static(path.join(__dirname, "public")));
 
 const authLimiter = rateLimit({
@@ -139,14 +193,6 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many attempts. Try again later." }
 });
-
-function signToken(user) {
-  return jwt.sign(
-    { sub: String(user.id), company_id: String(user.company_id), role: user.role, email: user.email },
-    JWT_SECRET,
-    { expiresIn: "12h" }
-  );
-}
 
 function auth(req, res, next) {
   const h = req.headers.authorization || "";
@@ -383,7 +429,7 @@ app.get("/api/me", auth, async (req,res)=>{
   try{
     const r=await pool.query(
       `SELECT u.id,u.name,u.email,u.role,u.email_verified,c.id AS company_id,c.name AS company_name,
-       c.subscription_status,c.subscription_plan,c.trial_ends_at,c.subscription_current_period_end,c.stripe_customer_id
+       c.subscription_status,c.subscription_plan,c.trial_ends_at,c.subscription_current_period_end,c.stripe_customer_id,c.cancel_at_period_end
        FROM users u JOIN companies c ON c.id=u.company_id
        WHERE u.id=$1 AND u.company_id=$2`,[req.user.sub,req.user.company_id]);
     res.json(r.rows[0]||null);
