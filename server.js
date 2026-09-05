@@ -121,7 +121,13 @@ app.post("/api/stripe/webhook", express.raw({type:"application/json"}), async (r
       await pool.query(`UPDATE companies SET stripe_customer_id=$1,stripe_subscription_id=$2 WHERE id=$3`,[obj.customer,obj.subscription,obj.metadata.company_id]);
     if(["customer.subscription.created","customer.subscription.updated","customer.subscription.deleted"].includes(event.type)){
   const companyId=obj.metadata?.company_id;
-  const plan=obj.metadata?.plan||null;
+  const priceId=obj.items?.data?.[0]?.price?.id;
+
+const plan=
+  obj.metadata?.plan ||
+  (priceId===STRIPE_PRICE_FOUNDING ? "founding" :
+   priceId===STRIPE_PRICE_BUSINESS ? "business" :
+   null);
   const trialEnd=obj.trial_end?new Date(obj.trial_end*1000):null;
   const periodEnd=obj.current_period_end?new Date(obj.current_period_end*1000):null;
   const cancelAtPeriodEnd=Boolean(obj.cancel_at_period_end);
