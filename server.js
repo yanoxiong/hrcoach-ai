@@ -194,6 +194,19 @@ const authLimiter = rateLimit({
   message: { error: "Too many attempts. Try again later." }
 });
 
+function signToken(user) {
+  return jwt.sign(
+    {
+      sub: String(user.id),
+      company_id: String(user.company_id),
+      role: user.role,
+      email: user.email
+    },
+    JWT_SECRET,
+    { expiresIn: "12h" }
+  );
+}
+
 function auth(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : null;
