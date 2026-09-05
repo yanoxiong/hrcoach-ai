@@ -352,10 +352,11 @@ function render(){
     return;
   }
 
-  if(state.route==="account"){
-    const status=state.user.subscription_status||"No subscription";
-    const plan=state.user.subscription_plan||"No plan";
-
+ if(state.route==="account"){
+  const status=state.user.subscription_status||"No subscription";
+  const plan=state.user.subscription_plan||"No plan";
+  const hasSubscription=["trialing","active","past_due"].includes(status);
+  const cancelling=Boolean(state.user.cancel_at_period_end);
     $("#main").innerHTML=`
       <h2 class="section-title">Account & Billing</h2>
 
@@ -383,6 +384,12 @@ function render(){
               ? `<p><strong>Trial ends:</strong> ${new Date(state.user.trial_ends_at).toLocaleDateString()}</p>`
               : ""
           }
+
+          ${
+  cancelling
+    ? `<p><strong>Cancellation:</strong> Scheduled to end at the end of the current trial/billing period.</p>`
+    : ""
+}
         </div>
 
         <div class="grid">
@@ -393,20 +400,22 @@ function render(){
             <p>14-day free trial.</p>
             <p>Credit card required. Billing begins automatically after the trial unless canceled.</p>
 
-            <button class="primary plan-btn" data-plan="founding">
-              Start 14-Day Trial
-            </button>
+            ${
+  hasSubscription
+    ? `<button class="secondary" disabled>Subscription already active</button>`
+    : `<button class="primary plan-btn" data-plan="founding">Start 14-Day Trial</button>`
+}
           </div>
 
           <div class="card">
             <h3>Business</h3>
             <p><strong>$59.99/month</strong></p>
-            <p>14-day free trial.</p>
-            <p>Credit card required. Billing begins automatically after the trial unless canceled.</p>
-
-            <button class="primary plan-btn" data-plan="business">
-              Start 14-Day Trial
-            </button>
+            <p>14-day free trial.</p><p>Credit card required. Billing begins automatically after the trial unless canceled.</p>
+            ${
+  hasSubscription
+    ? `<button class="secondary" disabled>Subscription already active</button>`
+    : `<button class="primary plan-btn" data-plan="business">Start 14-Day Trial</button>`
+}
           </div>
 
         </div>
