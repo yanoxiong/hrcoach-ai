@@ -11,6 +11,7 @@ const nodemailer = require("nodemailer");
 const { Resend } = require("resend");
 const { Pool } = require("pg");
 const OpenAI = require("openai");
+const Stripe = require("stripe");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -22,6 +23,11 @@ const APP_BASE_URL = (process.env.APP_BASE_URL || `http://localhost:${PORT}`).re
 const EMAIL_MODE = String(process.env.EMAIL_MODE || "console").toLowerCase();
 const REQUIRE_EMAIL_VERIFICATION =
   String(process.env.REQUIRE_EMAIL_VERIFICATION || "true").toLowerCase() === "true";
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+const STRIPE_PRICE_FOUNDING = process.env.STRIPE_PRICE_FOUNDING || "";
+const STRIPE_PRICE_BUSINESS = process.env.STRIPE_PRICE_BUSINESS || "";
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
 if (!DATABASE_URL) {
   console.error("DATABASE_URL is required.");
@@ -92,11 +98,36 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_employees_company ON employees(company_id);
     CREATE INDEX IF NOT EXISTS idx_records_company ON records(company_id);
     CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'none';
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_plan TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMPTZ;
   `);
 }
 
 app.set("trust proxy", 1);
 app.use(helmet());
+app.post("/api/stripe/webhook", express.raw({type:"application/json"}), async (req,res)=>{
+  if(!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(503).send("Stripe is not configured.");
+  let event;
+  try { event=stripe.webhooks.constructEvent(req.body,req.headers["stripe-signature"],STRIPE_WEBHOOK_SECRET); }
+  catch(e){ console.error("Stripe webhook signature error:",e.message); return res.status(400).send("Invalid signature."); }
+  try {
+    const obj=event.data.object;
+    if(event.type==="checkout.session.completed" && obj.mode==="subscription" && obj.metadata?.company_id)
+      await pool.query(`UPDATE companies SET stripe_customer_id=$1,stripe_subscription_id=$2 WHERE id=$3`,[obj.customer,obj.subscription,obj.metadata.company_id]);
+    if(["customer.subscription.created","customer.subscription.updated","customer.subscription.deleted"].includes(event.type)){
+      const companyId=obj.metadata?.company_id, plan=obj.metadata?.plan||null;
+      const trialEnd=obj.trial_end?new Date(obj.trial_end*1000):null, periodEnd=obj.current_period_end?new Date(obj.current_period_end*1000):null;
+      if(companyId) await pool.query(`UPDATE companies SET stripe_customer_id=$1,stripe_subscription_id=$2,subscription_status=$3,subscription_plan=COALESCE($4,subscription_plan),trial_ends_at=$5,subscription_current_period_end=$6 WHERE id=$7`,[obj.customer,obj.id,obj.status,plan,trialEnd,periodEnd,companyId]);
+      else await pool.query(`UPDATE companies SET subscription_status=$1,trial_ends_at=$2,subscription_current_period_end=$3 WHERE stripe_subscription_id=$4`,[obj.status,trialEnd,periodEnd,obj.id]);
+    }
+    if(event.type==="invoice.payment_failed"){ const sid=typeof obj.subscription==="string"?obj.subscription:obj.subscription?.id; if(sid) await pool.query(`UPDATE companies SET subscription_status='past_due' WHERE stripe_subscription_id=$1`,[sid]); }
+    res.json({received:true});
+  }catch(e){console.error("Stripe webhook handler error:",e);res.status(500).send("Webhook handler failed.");}
+});
 app.use(express.json({ limit: "100kb" }));
 app.use(rateLimit({ windowMs: 15*60*1000, max: 300, standardHeaders: true, legacyHeaders: false }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -351,11 +382,37 @@ app.post("/api/auth/reset-password", authLimiter, async (req,res)=>{
 app.get("/api/me", auth, async (req,res)=>{
   try{
     const r=await pool.query(
-      `SELECT u.id,u.name,u.email,u.role,u.email_verified,c.id AS company_id,c.name AS company_name
+      `SELECT u.id,u.name,u.email,u.role,u.email_verified,c.id AS company_id,c.name AS company_name,
+       c.subscription_status,c.subscription_plan,c.trial_ends_at,c.subscription_current_period_end,c.stripe_customer_id
        FROM users u JOIN companies c ON c.id=u.company_id
        WHERE u.id=$1 AND u.company_id=$2`,[req.user.sub,req.user.company_id]);
     res.json(r.rows[0]||null);
   }catch(e){console.error(e);res.status(500).json({error:"Could not load account."});}
+});
+
+app.get("/api/billing/plans", auth, (req,res)=>res.json({configured:Boolean(stripe&&STRIPE_PRICE_FOUNDING&&STRIPE_PRICE_BUSINESS),plans:[{id:"founding",name:"Founding Manager",price:"$29.99"},{id:"business",name:"Business",price:"$59.99"}]}));
+
+app.post("/api/billing/checkout", auth, async (req,res)=>{
+  try{
+    if(!stripe) return res.status(503).json({error:"Stripe is not configured."});
+    if(req.user.role!=="admin") return res.status(403).json({error:"Only an admin can manage billing."});
+    const plan=String(req.body?.plan||""), priceId=plan==="founding"?STRIPE_PRICE_FOUNDING:plan==="business"?STRIPE_PRICE_BUSINESS:null;
+    if(!priceId) return res.status(400).json({error:"Choose a valid plan."});
+    const c=(await pool.query(`SELECT stripe_customer_id,subscription_status FROM companies WHERE id=$1`,[req.user.company_id])).rows[0];
+    const u=(await pool.query(`SELECT email FROM users WHERE id=$1`,[req.user.sub])).rows[0];
+    if(["trialing","active"].includes(c?.subscription_status)) return res.status(409).json({error:"This company already has an active subscription."});
+    const session=await stripe.checkout.sessions.create({mode:"subscription",customer:c?.stripe_customer_id||undefined,customer_email:c?.stripe_customer_id?undefined:u?.email,line_items:[{price:priceId,quantity:1}],payment_method_collection:"always",subscription_data:{trial_period_days:14,metadata:{company_id:String(req.user.company_id),plan}},metadata:{company_id:String(req.user.company_id),plan},success_url:`${APP_BASE_URL}/?checkout=success`,cancel_url:`${APP_BASE_URL}/?checkout=cancelled`});
+    res.json({url:session.url});
+  }catch(e){console.error(e);res.status(500).json({error:"Could not start Stripe Checkout."});}
+});
+
+app.post("/api/billing/portal", auth, async (req,res)=>{
+  try{
+    if(!stripe) return res.status(503).json({error:"Stripe is not configured."});
+    const c=(await pool.query(`SELECT stripe_customer_id FROM companies WHERE id=$1`,[req.user.company_id])).rows[0];
+    if(!c?.stripe_customer_id) return res.status(400).json({error:"No Stripe customer exists yet."});
+    const session=await stripe.billingPortal.sessions.create({customer:c.stripe_customer_id,return_url:`${APP_BASE_URL}/?billing=return`}); res.json({url:session.url});
+  }catch(e){console.error(e);res.status(500).json({error:"Could not open billing portal."});}
 });
 
 app.get("/api/employees", auth, async (req,res)=>{

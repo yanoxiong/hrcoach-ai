@@ -100,3 +100,15 @@ Use fictional data and have 5-10 managers try:
 - Recognition
 
 Measure which feature they would pay for before adding payroll, scheduling, recruiting, or other large HRIS features.
+
+## Stripe sandbox billing
+Required environment variables:
+- `STRIPE_SECRET_KEY` (sandbox `sk_test_...`)
+- `STRIPE_WEBHOOK_SECRET` (`whsec_...` from the sandbox destination)
+- `STRIPE_PRICE_FOUNDING=price_1UCEv9JJ6FKimMlwcQl9i8G9`
+- `STRIPE_PRICE_BUSINESS=price_1UCEwZJJ6FKimMlwldpvXG5U`
+
+Webhook endpoint: `https://hrcoachapp.com/api/stripe/webhook`
+Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`, `invoice.paid`.
+
+Checkout requires a payment method and starts a 14-day trial. Before production launch, replace all sandbox Stripe values with matching live-mode keys/prices and create a live webhook destination.
