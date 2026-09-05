@@ -151,12 +151,13 @@ const plan=
        SET subscription_status=$1,
            trial_ends_at=$2,
            subscription_current_period_end=$3,
-           cancel_at_period_end=$4
-       WHERE stripe_subscription_id=$5`,
-      [obj.status,trialEnd,periodEnd,cancelAtPeriodEnd,obj.id]
+           cancel_at_period_end=$4,
+           subscription_plan=COALESCE($5,subscription_plan)
+       WHERE stripe_subscription_id=$6`,
+      [obj.status,trialEnd,periodEnd,cancelAtPeriodEnd,plan,obj.id]
     );
   }
-}   
+}
     
 if(event.type==="invoice.payment_failed"){
   const sid=typeof obj.subscription==="string"
