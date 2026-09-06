@@ -357,6 +357,9 @@ function render(){
   const plan=state.user.subscription_plan||"No plan";
   const hasSubscription=["trialing","active","past_due"].includes(status);
   const cancelling=Boolean(state.user.cancel_at_period_end);
+   const aiUsed=Number(state.user.ai_requests_used||0);
+const aiLimit=Number(state.user.ai_request_limit||0);
+const aiRemaining=Number(state.user.ai_requests_remaining||0);
     $("#main").innerHTML=`
       <h2 class="section-title">Account & Billing</h2>
 
@@ -368,6 +371,16 @@ function render(){
             ${esc(state.user.email)} ·
             ${state.user.email_verified?"Verified":"Not verified"}
           </p>
+
+${
+  aiLimit>0
+    ? `<div style="margin-top:16px">
+         <h4>AI Usage</h4>
+         <p><strong>${aiUsed}</strong> of <strong>${aiLimit}</strong> requests used this month</p>
+         <p><strong>${aiRemaining}</strong> requests remaining</p>
+       </div>`
+    : ""
+}
 
           <p>
             <strong>Subscription status:</strong>
