@@ -94,10 +94,6 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users(LOWER(email));
-    CREATE INDEX IF NOT EXISTS idx_employees_company ON employees(company_id);
-    CREATE INDEX IF NOT EXISTS idx_records_company ON records(company_id);
-    CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'none';
@@ -105,6 +101,18 @@ async function initDb() {
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ;
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMPTZ;
     ALTER TABLE companies ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE;
+
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id BIGSERIAL PRIMARY KEY,
+      company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      period_month DATE NOT NULL,
+      request_count INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(company_id, period_month)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_usage_company
+    ON ai_usage(company_id);
+
   `);
 }
 
@@ -550,21 +558,38 @@ For serious safety, harassment, discrimination, retaliation, accommodation, leav
 }
 
 app.post("/api/ai/generate", auth, async (req,res)=>{
+  let usageReserved=false;
+
   try{
     const {tool="ask",employeeId=null,category="",situation=""}=req.body||{};
-    if(!String(situation).trim()) return res.status(400).json({error:"Situation details are required."});
-    if(!["ask","documentation","conversation","recognition"].includes(tool)) return res.status(400).json({error:"Unknown tool."});
-    if(!(await employeeBelongs(employeeId,req.user.company_id))) return res.status(403).json({error:"Invalid employee."});
+
+    if(!String(situation).trim()){
+      return res.status(400).json({error:"Situation details are required."});
+    }
+
+    if(!["ask","documentation","conversation","recognition"].includes(tool)){
+      return res.status(400).json({error:"Unknown tool."});
+    }
+
+    if(!(await employeeBelongs(employeeId,req.user.company_id))){
+      return res.status(403).json({error:"Invalid employee."});
+    }
 
     let employee=null;
+
     if(employeeId){
-      const r=await pool.query("SELECT name,position,department FROM employees WHERE id=$1 AND company_id=$2",[employeeId,req.user.company_id]);
+      const r=await pool.query(
+        "SELECT name,position,department FROM employees WHERE id=$1 AND company_id=$2",
+        [employeeId,req.user.company_id]
+      );
       employee=r.rows[0]||null;
     }
+
     const employeeName=employee?.name||"Employee";
 
     if(DEMO_MODE||!process.env.OPENAI_API_KEY){
-      return res.json({text:`Suggested approach for ${employeeName}
+      return res.json({
+        text:`Suggested approach for ${employeeName}
 
 1. Confirm the facts.
 2. Ask for the employee's perspective.
@@ -572,10 +597,63 @@ app.post("/api/ai/generate", auth, async (req,res)=>{
 4. Document objectively.
 5. Set a follow-up point.
 
-Review against company policy before acting.`,mode:"demo"});
+Review against company policy before acting.`,
+        mode:"demo"
+      });
     }
 
-    const client=new OpenAI({apiKey:process.env.OPENAI_API_KEY});
+    const billing=await pool.query(
+      `SELECT subscription_status,subscription_plan
+       FROM companies
+       WHERE id=$1`,
+      [req.user.company_id]
+    );
+
+    const status=billing.rows[0]?.subscription_status||"none";
+    const plan=billing.rows[0]?.subscription_plan||null;
+
+    if(!["trialing","active"].includes(status)){
+      return res.status(402).json({
+        error:"An active HRCoach subscription is required to use AI tools."
+      });
+    }
+
+    const monthlyLimit=
+      plan==="founding" ? 300 :
+      plan==="business" ? 1000 :
+      null;
+
+    if(!monthlyLimit){
+      return res.status(403).json({
+        error:"Your subscription plan could not be identified. Please contact support."
+      });
+    }
+
+    const usage=await pool.query(
+      `INSERT INTO ai_usage(company_id,period_month,request_count)
+       VALUES($1,date_trunc('month',CURRENT_DATE)::date,1)
+       ON CONFLICT (company_id,period_month)
+       DO UPDATE
+       SET request_count=ai_usage.request_count+1
+       WHERE ai_usage.request_count<$2
+       RETURNING request_count`,
+      [req.user.company_id,monthlyLimit]
+    );
+
+    if(!usage.rowCount){
+      return res.status(429).json({
+        error:`You have reached your ${monthlyLimit}-request monthly AI limit.`
+      });
+    }
+
+    usageReserved=true;
+
+    const used=usage.rows[0].request_count;
+
+    const client=new OpenAI({
+      apiKey:process.env.OPENAI_API_KEY
+    });
+
     const context=[
       `Employee name: ${employeeName}`,
       employee?.position?`Position: ${employee.position}`:"",
@@ -589,10 +667,45 @@ Review against company policy before acting.`,mode:"demo"});
       instructions:systemPrompt(tool),
       input:context
     });
+
     const text=response.output_text?.trim();
-    if(!text) throw new Error("No text returned.");
-    res.json({text,mode:"live"});
-  }catch(e){console.error(e);res.status(502).json({error:"AI service could not generate a response. Try again."});}
+
+    if(!text){
+      throw new Error("No text returned.");
+    }
+
+    res.json({
+      text,
+      mode:"live",
+      usage:{
+        used,
+        limit:monthlyLimit,
+        remaining:Math.max(monthlyLimit-used,0)
+      }
+    });
+
+  }catch(e){
+
+    if(usageReserved){
+      try{
+        await pool.query(
+          `UPDATE ai_usage
+           SET request_count=GREATEST(request_count-1,0)
+           WHERE company_id=$1
+           AND period_month=date_trunc('month',CURRENT_DATE)::date`,
+          [req.user.company_id]
+        );
+      }catch(usageError){
+        console.error("Could not roll back AI usage:",usageError);
+      }
+    }
+
+    console.error(e);
+
+    res.status(502).json({
+      error:"AI service could not generate a response. Try again."
+    });
+  }
 });
 
 app.delete("/api/account", auth, async (req,res)=>{
