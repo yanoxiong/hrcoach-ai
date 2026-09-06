@@ -405,47 +405,53 @@ ${
 }
         </div>
 
-        <div class="grid">
+              <div class="grid">
 
-          <div class="card">
-            <h3>Founding Manager</h3>
-            <p><strong>$29.99/month</strong></p>
-            <p>14-day free trial.</p>
-            <p>Credit card required. Billing begins automatically after the trial unless canceled.</p>
+        <div class="card">
+          <h3>Founding Manager</h3>
+          <p><strong>$29.99/month</strong></p>
+          <p>14-day free trial.</p>
+          <p>Credit card required. Billing begins automatically after the trial unless canceled.</p>
 
-            ${
-  hasSubscription
-    ? `<button class="secondary" disabled>Subscription already active</button>`
-    : `<button class="primary plan-btn" data-plan="founding">Start 14-Day Trial</button>`
-}
-          </div>
-
-          <div class="card">
-            <h3>Business</h3>
-            <p><strong>$59.99/month</strong></p>
-            <p>14-day free trial.</p><p>Credit card required. Billing begins automatically after the trial unless canceled.</p>
-            ${
-  hasSubscription
-    ? `<button class="secondary" disabled>Subscription already active</button>`
-    : `<button class="primary plan-btn" data-plan="business">Start 14-Day Trial</button>`
-}
-          </div>
-
+          ${
+            hasSubscription
+              ? plan==="founding"
+                ? `<button class="secondary" disabled>Current Plan ✓</button>`
+                : `<button class="secondary" disabled>Available through Manage Billing</button>`
+              : `<button class="primary plan-btn" data-plan="founding">Start 14-Day Trial</button>`
+          }
         </div>
 
-        ${
-          state.user.stripe_customer_id
-            ? `<div class="card">
-                 <h3>Manage Subscription</h3>
-                 <p>Update payment information, review billing, or cancel your subscription.</p>
-                 <button id="billingPortal" class="secondary">
-                   Manage Billing
-                 </button>
-               </div>`
-            : ""
-        }
+        <div class="card">
+          <h3>Business</h3>
+          <p><strong>$59.99/month</strong></p>
+          <p>14-day free trial.</p>
+          <p>Credit card required. Billing begins automatically after the trial unless canceled.</p>
+
+          ${
+            hasSubscription
+              ? plan==="business"
+                ? `<button class="secondary" disabled>Current Plan ✓</button>`
+                : `<button class="secondary" disabled>Upgrade through Manage Billing</button>`
+              : `<button class="primary plan-btn" data-plan="business">Start 14-Day Trial</button>`
+          }
+        </div>
 
       </div>
+
+      ${
+        state.user.stripe_customer_id
+          ? `<div class="card">
+               <h3>Manage Subscription</h3>
+               <p>Change your plan, update payment information, review billing, or cancel your subscription.</p>
+               <button id="billingPortal" class="secondary">
+                 Manage Billing
+               </button>
+             </div>`
+          : ""
+      }
+
+    </div>
     `;
 
     $$(".plan-btn").forEach(b=>{
