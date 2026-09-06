@@ -456,12 +456,53 @@ app.post("/api/auth/reset-password", authLimiter, async (req,res)=>{
 app.get("/api/me", auth, async (req,res)=>{
   try{
     const r=await pool.query(
-      `SELECT u.id,u.name,u.email,u.role,u.email_verified,c.id AS company_id,c.name AS company_name,
-       c.subscription_status,c.subscription_plan,c.trial_ends_at,c.subscription_current_period_end,c.stripe_customer_id,c.cancel_at_period_end
-       FROM users u JOIN companies c ON c.id=u.company_id
-       WHERE u.id=$1 AND u.company_id=$2`,[req.user.sub,req.user.company_id]);
-    res.json(r.rows[0]||null);
-  }catch(e){console.error(e);res.status(500).json({error:"Could not load account."});}
+      `SELECT
+         u.id,
+         u.name,
+         u.email,
+         u.role,
+         u.email_verified,
+         c.id AS company_id,
+         c.name AS company_name,
+         c.subscription_status,
+         c.subscription_plan,
+         c.trial_ends_at,
+         c.subscription_current_period_end,
+         c.stripe_customer_id,
+         c.cancel_at_period_end,
+         COALESCE(au.request_count,0) AS ai_requests_used
+       FROM users u
+       JOIN companies c ON c.id=u.company_id
+       LEFT JOIN ai_usage au
+         ON au.company_id=c.id
+        AND au.period_month=date_trunc('month',CURRENT_DATE)::date
+       WHERE u.id=$1 AND u.company_id=$2`,
+      [req.user.sub,req.user.company_id]
+    );
+
+    const user=r.rows[0]||null;
+
+    if(!user){
+      return res.json(null);
+    }
+
+    const aiLimit=
+      user.subscription_plan==="founding" ? 300 :
+      user.subscription_plan==="business" ? 1000 :
+      0;
+
+    user.ai_request_limit=aiLimit;
+    user.ai_requests_remaining=Math.max(
+      aiLimit-Number(user.ai_requests_used||0),
+      0
+    );
+
+    res.json(user);
+
+  }catch(e){
+    console.error(e);
+    res.status(500).json({error:"Could not load account."});
+  }
 });
 
 app.get("/api/billing/plans", auth, (req,res)=>res.json({configured:Boolean(stripe&&STRIPE_PRICE_FOUNDING&&STRIPE_PRICE_BUSINESS),plans:[{id:"founding",name:"Founding Manager",price:"$29.99"},{id:"business",name:"Business",price:"$59.99"}]}));
