@@ -35,6 +35,20 @@ function setAuthMode(m){
   $("#registerTab").classList.toggle("active",m==="register");
 }
 
+function showAuth(mode="login"){
+  $("#landingView")?.classList.add("hidden");
+  $("#authView").classList.remove("hidden");
+  setAuthMode(mode);
+}
+
+$("#landingSignIn")?.addEventListener("click",()=>showAuth("login"));
+$("#landingSignIn2")?.addEventListener("click",()=>showAuth("login"));
+
+$("#landingTrial")?.addEventListener("click",()=>showAuth("register"));
+$("#landingTrial2")?.addEventListener("click",()=>showAuth("register"));
+$("#landingFounding")?.addEventListener("click",()=>showAuth("register"));
+$("#landingBusiness")?.addEventListener("click",()=>showAuth("register"));
+
 function backToLogin(){
   hidePanels();
   $("#normalAuth").classList.remove("hidden");
@@ -200,17 +214,18 @@ async function boot(){
   state.health=await api("/api/health");
 
   if(await handleMagicLinks()){
+    $("#landingView")?.classList.add("hidden");
     $("#authView").classList.remove("hidden");
     $("#appView").classList.add("hidden");
     return;
   }
 
   if(!state.token){
-    $("#authView").classList.remove("hidden");
+    $("#landingView")?.classList.remove("hidden");
+    $("#authView").classList.add("hidden");
     $("#appView").classList.add("hidden");
     return;
   }
-
   try{
     state.user=await api("/api/me");
 
@@ -240,8 +255,9 @@ async function boot(){
     $("#companyName").textContent=state.user.company_name;
     $("#modeBadge").textContent=state.health.demoMode?"Demo AI":"Live AI";
 
-    $("#authView").classList.add("hidden");
-    $("#appView").classList.remove("hidden");
+   $("#landingView")?.classList.add("hidden");
+$("#authView").classList.add("hidden");
+$("#appView").classList.remove("hidden");
 
     state.route="home";
     render();
