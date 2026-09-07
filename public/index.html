@@ -5,11 +5,394 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HRCoach AI</title>
 <link rel="stylesheet" href="/styles.css">
+  <style>
+  .landing-page {
+    min-height: 100vh;
+    background: #f6f7f9;
+  }
+
+  .landing-header {
+    max-width: 1100px;
+    margin: auto;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .landing-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+  }
+
+  .landing-hero {
+    padding: 80px 24px 70px;
+  }
+
+  .landing-hero-inner,
+  .landing-content {
+    max-width: 1000px;
+    margin: auto;
+  }
+
+  .landing-hero-inner {
+    max-width: 850px;
+    text-align: center;
+  }
+
+  .landing-eyebrow {
+    display: inline-block;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+
+  .landing-hero h1 {
+    font-size: clamp(36px, 6vw, 64px);
+    line-height: 1.05;
+    margin: 0 0 22px;
+  }
+
+  .landing-lead {
+    font-size: 20px;
+    line-height: 1.6;
+    max-width: 760px;
+    margin: 0 auto 28px;
+  }
+
+  .landing-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .landing-section {
+    padding: 60px 24px;
+  }
+
+  .landing-content > h2 {
+    text-align: center;
+    font-size: 34px;
+    margin-bottom: 28px;
+  }
+
+  .landing-content > p {
+    max-width: 760px;
+    margin: auto;
+    text-align: center;
+    font-size: 18px;
+    line-height: 1.7;
+  }
+
+  .landing-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .landing-card,
+  .landing-callout {
+    background: white;
+    border-radius: 16px;
+    padding: 26px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+  }
+
+  .landing-card h3 {
+    margin-top: 0;
+  }
+
+  .landing-card p,
+  .landing-callout p {
+    line-height: 1.65;
+  }
+
+  .landing-price {
+    font-size: 34px;
+    font-weight: 700;
+    margin: 12px 0 18px;
+  }
+
+  .landing-price span {
+    font-size: 16px;
+    font-weight: 400;
+  }
+
+  .landing-callout {
+    max-width: 780px;
+    margin: auto;
+    text-align: center;
+  }
+
+  .landing-callout strong {
+    font-size: 22px;
+  }
+
+  .landing-cta {
+    text-align: center;
+    padding: 70px 24px;
+  }
+
+  .landing-cta h2 {
+    font-size: 36px;
+    margin-bottom: 10px;
+  }
+
+  .landing-cta p {
+    font-size: 18px;
+    margin-bottom: 24px;
+  }
+
+  .landing-footer {
+    text-align: center;
+    padding: 30px 20px 50px;
+    font-size: 14px;
+  }
+
+  @media (max-width: 700px) {
+    .landing-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .landing-hero {
+      padding-top: 55px;
+    }
+
+    .landing-hero h1 {
+      font-size: 40px;
+    }
+
+    .landing-lead {
+      font-size: 18px;
+    }
+  }
+</style>
 </head>
 <body>
 <div id="toast" class="toast hidden"></div>
 
-<section id="authView" class="auth-page">
+<section id="landingView" class="landing-page">
+
+  <header class="landing-header">
+    <div class="landing-brand">
+      <div class="logo small">HC</div>
+      <strong>HRCoach AI</strong>
+    </div>
+
+    <button id="landingSignIn" class="ghost" type="button">
+      Sign In
+    </button>
+  </header>
+
+  <main>
+
+    <section class="landing-hero">
+      <div class="landing-hero-inner">
+
+        <span class="landing-eyebrow">
+          AI-powered management support
+        </span>
+
+        <h1>
+          Give managers a better way to handle difficult employee situations.
+        </h1>
+
+        <p class="landing-lead">
+          HRCoach AI helps frontline managers and small businesses prepare
+          conversations, create objective documentation, recognize employees,
+          and think through everyday workplace situations.
+        </p>
+
+        <div class="landing-actions">
+          <button id="landingTrial" class="primary" type="button">
+            Start 14-Day Free Trial
+          </button>
+
+          <button id="landingSignIn2" class="secondary" type="button">
+            Sign In
+          </button>
+        </div>
+
+        <p class="fine">
+          Credit card required. No charge today. Billing begins automatically
+          after the 14-day trial unless canceled.
+        </p>
+
+      </div>
+    </section>
+
+    <section class="landing-section">
+      <div class="landing-content">
+
+        <h2>Practical support when management gets complicated</h2>
+
+        <p>
+          Attendance problems, performance concerns, conflict, documentation,
+          difficult conversations, and employee recognition can all put
+          managers in uncomfortable situations. HRCoach provides a structured
+          starting point so managers can prepare before they act.
+        </p>
+
+      </div>
+    </section>
+
+    <section class="landing-section">
+      <div class="landing-content">
+
+        <h2>Four tools. One simple workspace.</h2>
+
+        <div class="landing-grid">
+
+          <div class="landing-card">
+            <h3>Ask HRCoach</h3>
+            <p>
+              Describe a workplace situation and receive structured manager
+              guidance, conversation ideas, and practical next steps.
+            </p>
+          </div>
+
+          <div class="landing-card">
+            <h3>Documentation Assistant</h3>
+            <p>
+              Turn manager notes into a more objective and organized workplace
+              documentation draft.
+            </p>
+          </div>
+
+          <div class="landing-card">
+            <h3>Difficult Conversation Coach</h3>
+            <p>
+              Prepare for attendance, performance, conduct, conflict, and other
+              challenging employee conversations.
+            </p>
+          </div>
+
+          <div class="landing-card">
+            <h3>Employee Recognition</h3>
+            <p>
+              Create professional recognition messages that highlight employee
+              behavior and its impact on the team.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <section class="landing-section">
+      <div class="landing-content">
+
+        <h2>Built for real managers</h2>
+
+        <div class="landing-callout">
+          <strong>You manage the people. HRCoach helps you prepare.</strong>
+          <p>
+            No complicated HR software implementation. Sign in, choose the
+            employee or situation, provide the relevant facts, and use HRCoach
+            to organize your next step.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="landing-section">
+      <div class="landing-content">
+
+        <h2>Simple pricing</h2>
+
+        <div class="landing-grid pricing-grid">
+
+          <div class="landing-card">
+            <h3>Founding Manager</h3>
+            <div class="landing-price">$29.99<span>/month</span></div>
+
+            <p>14-day free trial</p>
+            <p>Up to 300 AI requests per month</p>
+            <p>All four HRCoach AI tools</p>
+            <p>Employee management</p>
+            <p>Saved History</p>
+
+            <button id="landingFounding" class="primary" type="button">
+              Start Free Trial
+            </button>
+          </div>
+
+          <div class="landing-card">
+            <h3>Business</h3>
+            <div class="landing-price">$59.99<span>/month</span></div>
+
+            <p>14-day free trial</p>
+            <p>Up to 1,000 AI requests per month</p>
+            <p>All four HRCoach AI tools</p>
+            <p>Employee management</p>
+            <p>Saved History</p>
+
+            <button id="landingBusiness" class="primary" type="button">
+              Start Free Trial
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <section class="landing-section">
+      <div class="landing-content">
+
+        <h2>Responsible AI for workplace decisions</h2>
+
+        <div class="landing-callout">
+          <p>
+            HRCoach AI provides management-support tools and AI-generated
+            guidance. It does not replace your organization's HR department,
+            legal counsel, company policies, or professional advice.
+          </p>
+
+          <p>
+            Managers should involve qualified HR or legal professionals when
+            circumstances require it.
+          </p>
+
+          <p>
+            Protect employee privacy. Do not enter Social Security numbers,
+            financial account information, medical information, or unnecessary
+            sensitive personal information.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="landing-cta">
+      <h2>Give your managers a better starting point.</h2>
+      <p>Try HRCoach AI free for 14 days.</p>
+
+      <button id="landingTrial2" class="primary" type="button">
+        Start 14-Day Free Trial
+      </button>
+    </section>
+
+  </main>
+
+  <footer class="landing-footer">
+    <a href="/privacy.html">Privacy Policy</a>
+    &nbsp;|&nbsp;
+    <a href="/terms.html">Terms of Service</a>
+    &nbsp;|&nbsp;
+    <a href="/ai-disclaimer.html">AI & HR Disclaimer</a>
+    <br><br>
+    <span>Support: support@hrcoachapp.com</span>
+  </footer>
+
+</section>
+  
+<section id="authView" class="auth-page hidden">
   <div class="auth-wrap">
     <div class="brand-block">
       <div class="logo">HC</div>
