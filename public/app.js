@@ -439,7 +439,7 @@ ${
 
       </div>
 
-      ${
+            ${
         state.user.stripe_customer_id
           ? `<div class="card">
                <h3>Manage Subscription</h3>
@@ -451,9 +451,24 @@ ${
           : ""
       }
 
+      ${
+        state.user.role==="admin"
+          ? `<div class="card">
+               <h3>Delete Account</h3>
+               <p>
+                 Permanently delete this company account, including employees,
+                 saved records, and associated HRCoach data.
+               </p>
+               <button id="deleteAccountBtn" class="secondary">
+                 Delete Company Account
+               </button>
+             </div>`
+          : ""
+      }
+
     </div>
     `;
-
+   
     $$(".plan-btn").forEach(b=>{
       b.onclick=async()=>{
         try{
@@ -501,6 +516,45 @@ ${
       };
     }
 
+       const deleteAccountBtn=$("#deleteAccountBtn");
+
+    if(deleteAccountBtn){
+      deleteAccountBtn.onclick=async()=>{
+        const confirmed=confirm(
+          "Permanently delete this HRCoach company account? This cannot be undone."
+        );
+
+        if(!confirmed)return;
+
+        const confirmedAgain=confirm(
+          "This will delete employees, saved records, and account data. Continue?"
+        );
+
+        if(!confirmedAgain)return;
+
+        try{
+          deleteAccountBtn.disabled=true;
+          deleteAccountBtn.textContent="Deleting…";
+
+          await api("/api/account",{
+            method:"DELETE"
+          });
+
+          state.token="";
+          localStorage.removeItem("hrcoach_token");
+
+          alert("Your HRCoach company account has been deleted.");
+
+          window.location.href="/";
+
+        }catch(err){
+          toast(err.message);
+          deleteAccountBtn.disabled=false;
+          deleteAccountBtn.textContent="Delete Company Account";
+        }
+      };
+    }
+   
     return;
   }
 
