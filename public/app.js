@@ -313,99 +313,207 @@ function render(){
     return render();
   }
 
-  if(state.route==="employees"){
-    $("#main").innerHTML=`
-      <h2 class="section-title">Employees</h2>
-      <div class="stack">
-        ${
-          state.employees.map(e=>`
-            <div class="card">
-              <h3>${esc(e.name)}</h3>
-              <p>${esc(e.position||"")} · ${esc(e.department||"")}</p>
-            </div>
-          `).join("")
-        }
-      </div>
-    `;
-    return;
-  }
+ if(state.route==="employees"){
+  $("#main").innerHTML=`
+    <h2 class="section-title">Employees</h2>
 
-  if(state.route==="history"){
-    $("#main").innerHTML=`
-      <h2 class="section-title">History</h2>
-      <div class="stack">
-        ${
-          state.records.map(r=>`
-            <div class="card">
-              <span class="badge">${esc(r.type)}</span>
-              <h3>${esc(r.employee_name||"No employee")}</h3>
-              <details>
-                <summary>View</summary>
-                <div class="result">${esc(r.output_text)}</div>
-              </details>
-            </div>
-          `).join("") ||
-          "<div class='card'><p>No saved records yet.</p></div>"
-        }
-      </div>
-    `;
-    return;
-  }
+    <div class="card stack">
+      <h3>Add Employee</h3>
 
- if(state.route==="account"){
+      <label>
+        Name
+        <input id="employeeName" type="text" />
+      </label>
+
+      <label>
+        Position
+        <input id="employeePosition" type="text" />
+      </label>
+
+      <label>
+        Department
+        <input id="employeeDepartment" type="text" />
+      </label>
+
+      <label>
+        Start date
+        <input id="employeeStartDate" type="date" />
+      </label>
+
+      <button id="addEmployeeBtn" class="primary">
+        Add Employee
+      </button>
+    </div>
+
+    <div class="stack" style="margin-top:18px">
+      ${
+        state.employees.map(e=>`
+          <div class="card">
+            <h3>${esc(e.name)}</h3>
+            <p>${esc(e.position||"")} · ${esc(e.department||"")}</p>
+
+            <button
+              class="secondary delete-employee-btn"
+              data-id="${e.id}"
+              data-name="${esc(e.name)}"
+            >
+              Delete Employee
+            </button>
+          </div>
+        `).join("") ||
+        "<div class='card'><p>No employees yet.</p></div>"
+      }
+    </div>
+  `;
+
+  const addBtn=$("#addEmployeeBtn");
+
+  addBtn.onclick=async()=>{
+    const name=$("#employeeName").value.trim();
+    const position=$("#employeePosition").value.trim();
+    const department=$("#employeeDepartment").value.trim();
+    const startDate=$("#employeeStartDate").value;
+
+    if(!name){
+      return toast("Employee name is required.");
+    }
+
+    try{
+      addBtn.disabled=true;
+      addBtn.textContent="Adding…";
+
+      await api("/api/employees",{
+        method:"POST",
+        body:JSON.stringify({
+          name,
+          position,
+          department,
+          startDate
+        })
+      });
+
+      state.employees=await api("/api/employees");
+
+      toast("Employee added.");
+      render();
+
+    }catch(err){
+      toast(err.message);
+      addBtn.disabled=false;
+      addBtn.textContent="Add Employee";
+    }
+  };
+
+  $$(".delete-employee-btn").forEach(btn=>{
+    btn.onclick=async()=>{
+      const employeeName=btn.dataset.name;
+
+      if(!confirm(`Delete ${employeeName}?`)){
+        return;
+      }
+
+      try{
+        btn.disabled=true;
+        btn.textContent="Deleting…";
+
+        await api(`/api/employees/${btn.dataset.id}`,{
+          method:"DELETE"
+        });
+
+        state.employees=await api("/api/employees");
+
+        toast("Employee deleted.");
+        render();
+
+      }catch(err){
+        toast(err.message);
+        btn.disabled=false;
+        btn.textContent="Delete Employee";
+      }
+    };
+  });
+
+  return;
+}
+
+if(state.route==="history"){
+  $("#main").innerHTML=`
+    <h2 class="section-title">History</h2>
+    <div class="stack">
+      ${
+        state.records.map(r=>`
+          <div class="card">
+            <span class="badge">${esc(r.type)}</span>
+            <h3>${esc(r.employee_name||"No employee")}</h3>
+            <details>
+              <summary>View</summary>
+              <div class="result">${esc(r.output_text)}</div>
+            </details>
+          </div>
+        `).join("") ||
+        "<div class='card'><p>No saved records yet.</p></div>"
+      }
+    </div>
+  `;
+  return;
+}
+
+if(state.route==="account"){
   const status=state.user.subscription_status||"No subscription";
   const plan=state.user.subscription_plan||"No plan";
   const hasSubscription=["trialing","active","past_due"].includes(status);
   const cancelling=Boolean(state.user.cancel_at_period_end);
-   const aiUsed=Number(state.user.ai_requests_used||0);
-const aiLimit=Number(state.user.ai_request_limit||0);
-const aiRemaining=Number(state.user.ai_requests_remaining||0);
-    $("#main").innerHTML=`
-      <h2 class="section-title">Account & Billing</h2>
+  const aiUsed=Number(state.user.ai_requests_used||0);
+  const aiLimit=Number(state.user.ai_request_limit||0);
+  const aiRemaining=Number(state.user.ai_requests_remaining||0);
 
-      <div class="stack">
+  $("#main").innerHTML=`
+    <h2 class="section-title">Account & Billing</h2>
 
-        <div class="card">
-          <h3>${esc(state.user.company_name)}</h3>
-          <p>
-            ${esc(state.user.email)} ·
-            ${state.user.email_verified?"Verified":"Not verified"}
-          </p>
+    <div class="stack">
 
-${
-  aiLimit>0
-    ? `<div style="margin-top:16px">
-         <h4>AI Usage</h4>
-         <p><strong>${aiUsed}</strong> of <strong>${aiLimit}</strong> requests used this month</p>
-         <p><strong>${aiRemaining}</strong> requests remaining</p>
-       </div>`
-    : ""
-}
+      <div class="card">
+        <h3>${esc(state.user.company_name)}</h3>
 
-          <p>
-            <strong>Subscription status:</strong>
-            ${esc(status)}
-          </p>
+        <p>
+          ${esc(state.user.email)} ·
+          ${state.user.email_verified?"Verified":"Not verified"}
+        </p>
 
-          <p>
-            <strong>Current plan:</strong>
-            ${esc(plan)}
-          </p>
+        ${
+          aiLimit>0
+            ? `<div style="margin-top:16px">
+                 <h4>AI Usage</h4>
+                 <p><strong>${aiUsed}</strong> of <strong>${aiLimit}</strong> requests used this month</p>
+                 <p><strong>${aiRemaining}</strong> requests remaining</p>
+               </div>`
+            : ""
+        }
 
-          ${
-            state.user.trial_ends_at
-              ? `<p><strong>Trial ends:</strong> ${new Date(state.user.trial_ends_at).toLocaleDateString()}</p>`
-              : ""
-          }
+        <p>
+          <strong>Subscription status:</strong>
+          ${esc(status)}
+        </p>
 
-          ${
-  cancelling
-    ? `<p><strong>Cancellation:</strong> Scheduled to end at the end of the current trial/billing period.</p>`
-    : ""
-}
-        </div>
+        <p>
+          <strong>Current plan:</strong>
+          ${esc(plan)}
+        </p>
 
-              <div class="grid">
+        ${
+          state.user.trial_ends_at
+            ? `<p><strong>Trial ends:</strong> ${new Date(state.user.trial_ends_at).toLocaleDateString()}</p>`
+            : ""
+        }
+
+        ${
+          cancelling
+            ? `<p><strong>Cancellation:</strong> Scheduled to end at the end of the current trial/billing period.</p>`
+            : ""
+        }
+      </div>
+
+      <div class="grid">
 
         <div class="card">
           <h3>Founding Manager</h3>
@@ -439,7 +547,7 @@ ${
 
       </div>
 
-            ${
+      ${
         state.user.stripe_customer_id
           ? `<div class="card">
                <h3>Manage Subscription</h3>
@@ -467,96 +575,100 @@ ${
       }
 
     </div>
-    `;
-   
-    $$(".plan-btn").forEach(b=>{
-      b.onclick=async()=>{
-        try{
-          b.disabled=true;
-          b.textContent="Opening Stripe…";
+  `;
 
-          const d=await api("/api/billing/checkout",{
-            method:"POST",
-            body:JSON.stringify({plan:b.dataset.plan})
-          });
+  $$(".plan-btn").forEach(b=>{
+    b.onclick=async()=>{
+      try{
+        b.disabled=true;
+        b.textContent="Opening Stripe…";
 
-          if(!d.url)throw new Error("Stripe Checkout URL was not returned.");
+        const d=await api("/api/billing/checkout",{
+          method:"POST",
+          body:JSON.stringify({plan:b.dataset.plan})
+        });
 
-          window.location.href=d.url;
-
-        }catch(err){
-          toast(err.message);
-          b.disabled=false;
-          b.textContent="Start 14-Day Trial";
+        if(!d.url){
+          throw new Error("Stripe Checkout URL was not returned.");
         }
-      };
-    });
 
-    const portal=$("#billingPortal");
+        window.location.href=d.url;
 
-    if(portal){
-      portal.onclick=async()=>{
-        try{
-          portal.disabled=true;
-          portal.textContent="Opening billing…";
+      }catch(err){
+        toast(err.message);
+        b.disabled=false;
+        b.textContent="Start 14-Day Trial";
+      }
+    };
+  });
 
-          const d=await api("/api/billing/portal",{
-            method:"POST"
-          });
+  const portal=$("#billingPortal");
 
-          if(!d.url)throw new Error("Billing portal URL was not returned.");
+  if(portal){
+    portal.onclick=async()=>{
+      try{
+        portal.disabled=true;
+        portal.textContent="Opening billing…";
 
-          window.location.href=d.url;
+        const d=await api("/api/billing/portal",{
+          method:"POST"
+        });
 
-        }catch(err){
-          toast(err.message);
-          portal.disabled=false;
-          portal.textContent="Manage Billing";
+        if(!d.url){
+          throw new Error("Billing portal URL was not returned.");
         }
-      };
-    }
 
-       const deleteAccountBtn=$("#deleteAccountBtn");
+        window.location.href=d.url;
 
-    if(deleteAccountBtn){
-      deleteAccountBtn.onclick=async()=>{
-        const confirmed=confirm(
-          "Permanently delete this HRCoach company account? This cannot be undone."
-        );
-
-        if(!confirmed)return;
-
-        const confirmedAgain=confirm(
-          "This will delete employees, saved records, and account data. Continue?"
-        );
-
-        if(!confirmedAgain)return;
-
-        try{
-          deleteAccountBtn.disabled=true;
-          deleteAccountBtn.textContent="Deleting…";
-
-          await api("/api/account",{
-            method:"DELETE"
-          });
-
-          state.token="";
-          localStorage.removeItem("hrcoach_token");
-
-          alert("Your HRCoach company account has been deleted.");
-
-          window.location.href="/";
-
-        }catch(err){
-          toast(err.message);
-          deleteAccountBtn.disabled=false;
-          deleteAccountBtn.textContent="Delete Company Account";
-        }
-      };
-    }
-   
-    return;
+      }catch(err){
+        toast(err.message);
+        portal.disabled=false;
+        portal.textContent="Manage Billing";
+      }
+    };
   }
+
+  const deleteAccountBtn=$("#deleteAccountBtn");
+
+  if(deleteAccountBtn){
+    deleteAccountBtn.onclick=async()=>{
+      const confirmed=confirm(
+        "Permanently delete this HRCoach company account? This cannot be undone."
+      );
+
+      if(!confirmed)return;
+
+      const confirmedAgain=confirm(
+        "This will delete employees, saved records, and account data. Continue?"
+      );
+
+      if(!confirmedAgain)return;
+
+      try{
+        deleteAccountBtn.disabled=true;
+        deleteAccountBtn.textContent="Deleting…";
+
+        await api("/api/account",{
+          method:"DELETE"
+        });
+
+        state.token="";
+        localStorage.removeItem("hrcoach_token");
+
+        alert("Your HRCoach company account has been deleted.");
+
+        window.location.href="/";
+
+      }catch(err){
+        toast(err.message);
+        deleteAccountBtn.disabled=false;
+        deleteAccountBtn.textContent="Delete Company Account";
+      }
+    };
+  }
+
+  return;
+}
 
   const meta={
     ask:[
